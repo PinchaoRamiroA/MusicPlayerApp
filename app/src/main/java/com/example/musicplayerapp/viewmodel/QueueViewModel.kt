@@ -47,10 +47,11 @@ class QueueViewModel @Inject constructor(
     }
 
     fun togglePlayPause() {
-        if(playerUseCase.isPlaying.value){
+        if (playerUseCase.isPlaying.value) {
             playerUseCase.pause()
-        }else{
-            playerUseCase.play(_currentTrack.value!!)
+        } else {
+            val track = _currentTrack.value ?: return
+            playerUseCase.play(track)
         }
         _isPlaying.update { !it }
     }
