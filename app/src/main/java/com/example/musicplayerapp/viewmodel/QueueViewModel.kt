@@ -21,11 +21,8 @@ class QueueViewModel @Inject constructor(
     private val _queue = MutableStateFlow<List<MusicTrack>>(emptyList())
     val queue: StateFlow<List<MusicTrack>> = _queue
 
-    private val _currentTrack = MutableStateFlow<MusicTrack?>(null)
-    val currentTrack: StateFlow<MusicTrack?> = _currentTrack
-
-    private val _isPlaying = MutableStateFlow(false)
-    val isPlaying: StateFlow<Boolean> = _isPlaying
+    val currentTrack: StateFlow<MusicTrack?> = playerUseCase.currentTrack
+    val isPlaying: StateFlow<Boolean> = playerUseCase.isPlaying
 
     init {
         Log.d("QueueViewModel", "init called")
@@ -50,15 +47,12 @@ class QueueViewModel @Inject constructor(
         if (playerUseCase.isPlaying.value) {
             playerUseCase.pause()
         } else {
-            val track = _currentTrack.value ?: return
+            val track = playerUseCase.currentTrack.value ?: return
             playerUseCase.play(track)
         }
-        _isPlaying.update { !it }
     }
 
     fun playTrack(track: MusicTrack) {
         playerUseCase.play(track)
-        _currentTrack.update { track }
-        _isPlaying.update { true }
     }
 }
