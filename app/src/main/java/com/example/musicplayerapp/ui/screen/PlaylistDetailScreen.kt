@@ -113,43 +113,43 @@ fun PlaylistDetailScreen(
                 }
             }
         }
-        if (showMenuModal) {
-        TrackOptionsModal(
-            track = selectedTrack!!,
-            onDismiss = { showMenuModal = false },
-            onAddToFavorites = {
-                Log.d("MusicListScreen", "Añadir a favoritos: ${selectedTrack!!.title}")
-                favoritesViewModel.toggleFavorite(trackId = selectedTrack!!.id)
-                showMenuModal = false
-            },
-            onAddToPlaylist = {
-                Log.d("MusicListScreen", "Añadir a playlist: ${selectedTrack!!.title}")
-                showPlaylistModal = true
-            },
-
-            onRemoveFromPlaylist = {
-                Log.d("MusicListScreen", "Eliminar de playlist: ${selectedTrack!!.title}")
-                playlistViewModel.removeTrackFromPlaylist( playlistId, selectedTrack!!.id)
-                showMenuModal = false
-            },
-            onPlayNext = {
-                Log.d("MusicListScreen", "Reproducir siguiente: ${selectedTrack!!.title}")
-                playlistViewModel.queueNext(selectedTrack!!.id)
-                showMenuModal = false
+        selectedTrack?.let { track ->
+            if (showMenuModal) {
+                TrackOptionsModal(
+                    track = track,
+                    onDismiss = { showMenuModal = false },
+                    onAddToFavorites = {
+                        Log.d("MusicListScreen", "Añadir a favoritos: ${track.title}")
+                        favoritesViewModel.toggleFavorite(trackId = track.id)
+                        showMenuModal = false
+                    },
+                    onAddToPlaylist = {
+                        Log.d("MusicListScreen", "Añadir a playlist: ${track.title}")
+                        showPlaylistModal = true
+                    },
+                    onRemoveFromPlaylist = {
+                        Log.d("MusicListScreen", "Eliminar de playlist: ${track.title}")
+                        playlistViewModel.removeTrackFromPlaylist(playlistId, track.id)
+                        showMenuModal = false
+                    },
+                    onPlayNext = {
+                        Log.d("MusicListScreen", "Reproducir siguiente: ${track.title}")
+                        playlistViewModel.queueNext(track.id)
+                        showMenuModal = false
+                    }
+                )
             }
-        )
-        if (showPlaylistModal && selectedTrack != null) {
-            Log.d("MusicListScreen", "Playlist modal: ${selectedTrack!!.title}")
-            PlaylistSelectionModal(
-                playlists = allPlaylists,
-                onDismiss = { showPlaylistModal = false },
-                onPlaylistSelected = { playlistId ->
-                    playlistViewModel.addTrackToPlaylist(playlistId, selectedTrack!!)
-                    showPlaylistModal = false
-                }
-            )
+            if (showPlaylistModal) {
+                Log.d("MusicListScreen", "Playlist modal: ${track.title}")
+                PlaylistSelectionModal(
+                    playlists = allPlaylists,
+                    onDismiss = { showPlaylistModal = false },
+                    onPlaylistSelected = { targetPlaylistId ->
+                        playlistViewModel.addTrackToPlaylist(targetPlaylistId, track)
+                        showPlaylistModal = false
+                    }
+                )
+            }
         }
-
-    }
     }
 }
