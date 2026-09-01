@@ -85,7 +85,7 @@ class MusicServiceConnection @Inject constructor(
         controller?.setMediaItems(currentList)
         val newIndex = currentList.indexOfFirst { it.mediaId == current?.mediaId }
             .coerceAtLeast(0)
-        controller?.seekTo(newIndex, pos!!)
+        controller?.seekTo(newIndex, pos ?: 0L)
         controller?.prepare()
         controller?.play()
     }
