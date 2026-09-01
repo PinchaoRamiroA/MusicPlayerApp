@@ -55,16 +55,16 @@ fun MusicNavigationScreen(
     MaterialTheme(colorScheme = DarkColorScheme) {
         Scaffold(
             bottomBar = {
-                if (currentTrack != null) {
+                currentTrack?.let { track ->
                     NowPlayingFooter(
-                        currentTrack = currentTrack,
+                        currentTrack = track,
                         isPlaying = isPlaying,
                         isShuffleEnabled = isShuffleEnabled,
                         onPlayPauseClick = {
                             if (isPlaying) {
                                 musicListViewModel.pauseTrack()
                             } else {
-                                musicListViewModel.playTrack(currentTrack!!)
+                                musicListViewModel.playTrack(track)
                                 musicListViewModel.seekTo(currentPosition)
                             }
                         },
