@@ -129,13 +129,24 @@ class MusicServiceConnection @Inject constructor(
      *  Playlist Management
      *  ================================ */
     fun setPlaylist(tracks: List<MusicTrack>, startIndex: Int, playlistId: Long) {
-        if (originalList.isNotEmpty() && _isShuffleEnabled.value) return
-
         playlistRec.value = playlistId
         originalList = tracks.map { it.toMediaItem() }.toMutableList()
-        currentList = originalList.toMutableList()
 
-        controller?.setMediaItems(currentList, startIndex, 0L)
+        if (_isShuffleEnabled.value) {
+            val shuffled = originalList.toMutableList()
+            shuffled.shuffle()
+            val startTrack = tracks.getOrNull(startIndex)?.toMediaItem()
+            if (startTrack != null) {
+                shuffled.remove(startTrack)
+                shuffled.add(0, startTrack)
+            }
+            currentList = shuffled
+            controller?.setMediaItems(currentList, 0, 0L)
+        } else {
+            currentList = originalList.toMutableList()
+            controller?.setMediaItems(currentList, startIndex, 0L)
+        }
+
         controller?.prepare()
         _currentTrack.value = getCurrentMetadata()
     }
