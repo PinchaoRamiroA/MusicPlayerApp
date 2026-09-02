@@ -60,14 +60,26 @@ class GetPlaylistsUseCase @Inject constructor(
 class DeletePlaylistUseCase @Inject constructor(
     private val repository: PlaylistRepository
 ) {
-    suspend operator fun invoke(playlistId: Long) =
-        repository.deletePlaylistById(playlistId)
+    suspend operator fun invoke(playlistId: Long): Result<Unit> {
+        return try {
+            repository.deletePlaylistById(playlistId)
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }
 
 /** Quitar Track de Playlist **/
 class RemoveTrackFromPlaylistUseCase @Inject constructor(
     private val repository: PlaylistRepository
 ) {
-    suspend operator fun invoke(playlistId: Long, trackId: String) =
-        repository.removeTrackFromPlaylist(playlistId, trackId)
+    suspend operator fun invoke(playlistId: Long, trackId: String): Result<Unit> {
+        return try {
+            repository.removeTrackFromPlaylist(playlistId, trackId)
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }
