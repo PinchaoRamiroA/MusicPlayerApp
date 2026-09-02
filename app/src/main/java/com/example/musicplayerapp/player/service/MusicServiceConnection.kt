@@ -36,6 +36,7 @@ class MusicServiceConnection @Inject constructor(
 
     val playlistRec = MutableStateFlow<Long?>(null)
 
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var controller: MediaController? = null
     private var progressJob: Job? = null
 
@@ -188,7 +189,7 @@ class MusicServiceConnection @Inject constructor(
 
     private fun startProgressUpdates() {
         progressJob?.cancel()
-        progressJob = CoroutineScope(Dispatchers.Main).launch {
+        progressJob = serviceScope.launch {
             while (isActive) {
                 controller?.takeIf { it.isPlaying }?.let { _currentPosition.value = it.currentPosition }
                 delay(500)

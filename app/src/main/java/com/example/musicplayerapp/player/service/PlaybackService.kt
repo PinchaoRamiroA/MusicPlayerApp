@@ -96,28 +96,14 @@ class PlaybackService : MediaLibraryService() {
             pageSize: Int,
             params: LibraryParams?
         ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> {
-
-            val items = allTracks.map { track ->
-                MediaItem.Builder()
-                    .setMediaId(track.data)
-                    .setUri(track.data)
-                    .setMediaMetadata(
-                        MediaMetadata.Builder()
-                            .setTitle(track.title)
-                            .setArtist(track.artist)
-                            .setAlbumTitle(track.album)
-                            .setExtras(android.os.Bundle().apply {
-                                putLong("duration", track.duration)
-                            })
-                            .build()
-                    )
-                    .build()
+            val count = player.mediaItemCount
+            val items = (0 until count).map { index ->
+                player.getMediaItemAt(index)
             }
 
             return Futures.immediateFuture(
                 LibraryResult.ofItemList(ImmutableList.copyOf(items), params)
             )
-
         }
     }
 }

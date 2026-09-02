@@ -75,11 +75,11 @@ class PlaylistViewModel @Inject constructor(
     fun deletePlaylist(playlist: Playlist) {
         viewModelScope.launch {
             val result = playlistUseCases.deletePlaylist(playlist.id)
-//            if (result.isFailure) {
-//                _uiState.value = _uiState.value.copy(
-//                    error = result.exceptionOrNull()?.message ?: "Error al eliminar playlist"
-//                )
-//            }
+            if (result.isFailure) {
+                _uiState.value = _uiState.value.copy(
+                    error = result.exceptionOrNull()?.message ?: "Error al eliminar playlist"
+                )
+            }
         }
     }
 
@@ -97,11 +97,11 @@ class PlaylistViewModel @Inject constructor(
     fun removeTrackFromPlaylist(playlistId: Long, trackId: String) {
         viewModelScope.launch {
             val result = playlistUseCases.removeTrackFromPlaylist(playlistId, trackId)
-/*            if (result.isFailure) {
+            if (result.isFailure) {
                 _uiState.value = _uiState.value.copy(
                     error = result.exceptionOrNull()?.message ?: "Error al eliminar canción"
                 )
-            }*/
+            }
             Log.d("PlaylistViewModel", "Track removed from playlist: $trackId")
         }
     }

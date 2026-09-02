@@ -34,6 +34,11 @@ import com.example.musicplayerapp.viewmodel.FavoritesViewModel
 import com.example.musicplayerapp.viewmodel.MusicListViewModel
 import com.example.musicplayerapp.viewmodel.PlaylistViewModel
 
+import androidx.compose.ui.platform.LocalContext
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
+
 @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
 @Composable
 fun SongInfoScreen(
@@ -44,6 +49,7 @@ fun SongInfoScreen(
     favoritesViewModel: FavoritesViewModel = hiltViewModel(),
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val isFavorite = favoritesViewModel.isFavorite(track?.id ?: "")
     val isPlaying = musicListViewModel.isPlaying.collectAsState().value
     val currentPosition = musicListViewModel.currentPosition.collectAsState().value
@@ -107,10 +113,22 @@ fun SongInfoScreen(
             IconButton(onClick = { showPlaylistModal = true }) {
                 Icon(Icons.Default.AddCircle, contentDescription = "Add to Playlist", tint = MaterialTheme.colorScheme.onSurface)
             }
-            IconButton(onClick = { /* TODO: Settings */ }) {
+            IconButton(onClick = {
+                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.fromParts("package", context.packageName, null)
+                }
+                context.startActivity(intent)
+            }) {
                 Icon(Icons.Default.Settings, contentDescription = "Settings", tint = MaterialTheme.colorScheme.onSurface)
             }
-            IconButton(onClick = { /* TODO: Share */ }) {
+            IconButton(onClick = {
+                val sendIntent = Intent().apply {
+                    action = Intent.ACTION_SEND
+                    putExtra(Intent.EXTRA_TEXT, "Escuchando: ${track.title} - ${track.artist}")
+                    type = "text/plain"
+                }
+                context.startActivity(Intent.createChooser(sendIntent, "Compartir canción"))
+            }) {
                 Icon(Icons.Default.Share, contentDescription = "share", tint = MaterialTheme.colorScheme.onSurface)
             }
         }
