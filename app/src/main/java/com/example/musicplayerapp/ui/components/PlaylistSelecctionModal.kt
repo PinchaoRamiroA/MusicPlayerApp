@@ -5,12 +5,14 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.musicplayerapp.data.database.entities.PlaylistWithCount
@@ -22,7 +24,6 @@ fun PlaylistSelectionModal(
     onDismiss: () -> Unit,
     onPlaylistSelected: (Long) -> Unit
 ) {
-    if (playlists.isEmpty()) return
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         modifier = Modifier.fillMaxWidth()
@@ -30,20 +31,36 @@ fun PlaylistSelectionModal(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("Selecciona una playlist", style = MaterialTheme.typography.titleMedium)
-            Spacer(modifier = Modifier.height(8.dp))
-
-            playlists.forEach { (id, name) ->
-                TextButton(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = {
-                        onPlaylistSelected(id)
-                        onDismiss()
-                    }
+            if (playlists.isEmpty()) {
+                Text(
+                    text = "No hay playlists disponibles",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(name, style = MaterialTheme.typography.bodyLarge)
+                    Text("Cerrar")
+                }
+            } else {
+                Text("Selecciona una playlist", style = MaterialTheme.typography.titleMedium)
+                Spacer(modifier = Modifier.height(8.dp))
+
+                playlists.forEach { (id, name) ->
+                    TextButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = {
+                            onPlaylistSelected(id)
+                            onDismiss()
+                        }
+                    ) {
+                        Text(name, style = MaterialTheme.typography.bodyLarge)
+                    }
                 }
             }
         }
