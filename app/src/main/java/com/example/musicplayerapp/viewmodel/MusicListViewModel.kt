@@ -56,7 +56,9 @@ class MusicListViewModel @Inject constructor(
             runCatching { scanMusicUseCase() }
                 .onSuccess { tracks ->
                     if (tracks.isNotEmpty()) {
-                        playerUseCase.setPlaylist(tracks, startIndex = 0, playlistId = -1)
+                        if (playerUseCase.playlistId.value == null || playerUseCase.currentTrack.value == null) {
+                            playerUseCase.setPlaylist(tracks, startIndex = 0, playlistId = -1)
+                        }
                         _uiState.value = MusicListUiState.Success(tracks)
                     } else {
                         _uiState.value = MusicListUiState.Error("No se encontraron canciones")
