@@ -1,8 +1,6 @@
 package com.example.musicplayerapp.ui.screen
 
-import android.os.Build
 import android.util.Log
-import androidx.annotation.RequiresApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -39,7 +37,6 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
 
-@RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
 @Composable
 fun SongInfoScreen(
     track: MusicTrack?,

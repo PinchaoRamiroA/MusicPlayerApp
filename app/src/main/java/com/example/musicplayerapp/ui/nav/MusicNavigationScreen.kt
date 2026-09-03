@@ -1,7 +1,5 @@
 package com.example.musicplayerapp.ui.nav
 
-import android.os.Build
-import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -29,7 +27,6 @@ object MusicNavDestinations {
     const val QUEUE_ROUTE = "queue"
 }
 
-@RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MusicNavigationScreen(

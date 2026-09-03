@@ -14,8 +14,11 @@ object PermissionsManager {
      */
     fun getAudioPermissions(): Array<String> {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            // Android 13+ usa permisos específicos
-            arrayOf(Manifest.permission.READ_MEDIA_AUDIO)
+            // Android 13+ usa permisos específicos para audio y notificaciones
+            arrayOf(
+                Manifest.permission.READ_MEDIA_AUDIO,
+                Manifest.permission.POST_NOTIFICATIONS
+            )
         } else {
             // Android 12 e inferiores usan READ_EXTERNAL_STORAGE
             arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
