@@ -116,6 +116,20 @@ Este documento proporciona una auditoría detallada e inventario técnico de los
 
 ---
 
+### 2.5 `IllegalStateException` por llamada a `MediaController` fuera del Main Thread
+* **Ubicación:** [MusicServiceConnection.kt](file:///c:/dev/proyectos/MusicPlayerApp/app/src/main/java/com/example/musicplayerapp/player/service/MusicServiceConnection.kt#L132) / [MusicListViewModel.kt](file:///c:/dev/proyectos/MusicPlayerApp/app/src/main/java/com/example/musicplayerapp/viewmodel/MusicListViewModel.kt#L60)
+* **Código:**
+  ```kotlin
+  java.lang.IllegalStateException: MediaController method is called from a wrong thread. See javadoc of MediaController for details.
+      at androidx.media3.session.MediaController.verifyApplicationThread(MediaController.java:2113)
+      at androidx.media3.session.MediaController.setMediaItems(MediaController.java:1294)
+      at com.example.musicplayerapp.player.service.MusicServiceConnection.setPlaylist(MusicServiceConnection.kt:148)
+  ```
+* **Descripción:** Al completar la lectura asíncrona de canciones dentro de `MusicListViewModel.loadMusic()` sobre `Dispatchers.IO`, se invocaba `playerUseCase.setPlaylist(...)` directamente desde ese hilo en segundo plano. Media3 exige que todas las interacciones con `MediaController` se ejecuten exclusivamente en el hilo principal (`MainThread`), por lo cual la llamada causaba un crash fatal con `IllegalStateException`.
+* **Solución recomendada:** Garantizar que la invocación a `playerUseCase.setPlaylist(...)` se ejecute sobre `withContext(Dispatchers.Main)`.
+
+---
+
 ## 🧹 3. Código Comentado, Funcionalidades Incompletas y Fugas de Memoria
 
 ### 3.1 Funciones de borrado inactivas / código comentado

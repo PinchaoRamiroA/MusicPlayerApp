@@ -9,6 +9,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 sealed class MusicListUiState {
@@ -57,7 +58,9 @@ class MusicListViewModel @Inject constructor(
                 .onSuccess { tracks ->
                     if (tracks.isNotEmpty()) {
                         if (playerUseCase.playlistId.value == null || playerUseCase.currentTrack.value == null) {
-                            playerUseCase.setPlaylist(tracks, startIndex = 0, playlistId = -1)
+                            withContext(Dispatchers.Main) {
+                                playerUseCase.setPlaylist(tracks, startIndex = 0, playlistId = -1)
+                            }
                         }
                         _uiState.value = MusicListUiState.Success(tracks)
                     } else {
