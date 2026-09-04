@@ -14,6 +14,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
+enum class TrackSortOption(val displayName: String) {
+    NOMBRE("Nombre"),
+    DURACION("Duración"),
+    RECIENTES("Recientes"),
+    ARTISTA("Artista")
+}
+
 sealed class MusicListUiState {
     object Loading : MusicListUiState()
     data class Success(val tracks: List<MusicTrack>) : MusicListUiState()
@@ -27,8 +34,47 @@ class MusicListViewModel @Inject constructor(
     private val musicRepository: MusicRepository
 ) : ViewModel() {
 
+    private val _rawTracks = MutableStateFlow<List<MusicTrack>>(emptyList())
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+
+    private val _sortOption = MutableStateFlow(TrackSortOption.NOMBRE)
+    val sortOption: StateFlow<TrackSortOption> = _sortOption.asStateFlow()
+
+    private val _isAscending = MutableStateFlow(true)
+    val isAscending: StateFlow<Boolean> = _isAscending.asStateFlow()
+
     private val _uiState = MutableStateFlow<MusicListUiState>(MusicListUiState.Loading)
-    val uiState: StateFlow<MusicListUiState> = _uiState.asStateFlow()
+    val uiState: StateFlow<MusicListUiState> = combine(
+        _uiState,
+        _rawTracks,
+        _searchQuery,
+        _sortOption,
+        _isAscending
+    ) { state, rawTracks, query, sort, asc ->
+        if (state is MusicListUiState.Success) {
+            val filtered = if (query.isBlank()) {
+                rawTracks
+            } else {
+                rawTracks.filter {
+                    it.title.contains(query, ignoreCase = true) ||
+                            it.artist.contains(query, ignoreCase = true)
+                }
+            }
+
+            val sorted = when (sort) {
+                TrackSortOption.NOMBRE -> filtered.sortedBy { it.title.lowercase() }
+                TrackSortOption.DURACION -> filtered.sortedBy { it.duration }
+                TrackSortOption.RECIENTES -> filtered.sortedBy { it.id.toLongOrNull() ?: 0L }
+                TrackSortOption.ARTISTA -> filtered.sortedBy { it.artist.lowercase() }
+            }
+
+            val resultTracks = if (asc) sorted else sorted.reversed()
+            MusicListUiState.Success(resultTracks)
+        } else {
+            state
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), MusicListUiState.Loading)
 
     // 🎵 Flows del reproductor con valores iniciales para evitar nulls
     val currentTrack = playerUseCase.currentTrack.stateIn(viewModelScope, SharingStarted.Lazily, null)
@@ -41,6 +87,24 @@ class MusicListViewModel @Inject constructor(
 
     init {
         playerUseCase.connect()
+    }
+
+    fun setSearchQuery(query: String) {
+        _searchQuery.value = query
+    }
+
+    fun setSortOption(option: TrackSortOption) {
+        _sortOption.value = option
+    }
+
+    fun setSortOptionByString(optionName: String) {
+        TrackSortOption.values().find { it.displayName.equals(optionName, ignoreCase = true) }?.let {
+            _sortOption.value = it
+        }
+    }
+
+    fun toggleAscending() {
+        _isAscending.value = !_isAscending.value
     }
 
     fun playTrack(track: MusicTrack) = playerUseCase.play(track)
@@ -73,6 +137,7 @@ class MusicListViewModel @Inject constructor(
             runCatching { scanMusicUseCase() }
                 .onSuccess { tracks ->
                     if (tracks.isNotEmpty()) {
+                        _rawTracks.value = tracks
                         if (playerUseCase.playlistId.value == null || playerUseCase.currentTrack.value == null) {
                             withContext(Dispatchers.Main) {
                                 playerUseCase.setPlaylist(tracks, startIndex = 0, playlistId = -1)

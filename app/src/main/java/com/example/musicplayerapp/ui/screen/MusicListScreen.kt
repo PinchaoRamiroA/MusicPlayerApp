@@ -2,6 +2,8 @@ package com.example.musicplayerapp.ui.screen
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -18,6 +20,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
 import com.example.musicplayerapp.data.model.MusicTrack
 import com.example.musicplayerapp.ui.components.*
 import com.example.musicplayerapp.ui.theme.DarkColorScheme
@@ -37,9 +42,9 @@ fun MusicListScreen(
     val playlistId by viewModel.playlistId.collectAsState()
     val allPlaylists by playlistViewModel.uiState.collectAsState()
 
-    var searchQuery by remember { mutableStateOf("") }
-    var selectedSortOption by remember { mutableStateOf("Nombre") }
-    var isAscending by remember { mutableStateOf(true) }
+    val searchQuery by viewModel.searchQuery.collectAsState()
+    val sortOption by viewModel.sortOption.collectAsState()
+    val isAscending by viewModel.isAscending.collectAsState()
 
     var selectedTrack by remember { mutableStateOf<MusicTrack?>(null) }
     var isOptionsOpen by remember { mutableStateOf(false) }
@@ -73,11 +78,11 @@ fun MusicListScreen(
                     MusicListContent(
                         tracks = tracks,
                         searchQuery = searchQuery,
-                        onSearchQueryChange = { searchQuery = it },
-                        selectedSortOption = selectedSortOption,
-                        onSortOptionChange = { selectedSortOption = it },
+                        onSearchQueryChange = { viewModel.setSearchQuery(it) },
+                        selectedSortOption = sortOption.displayName,
+                        onSortOptionChange = { viewModel.setSortOptionByString(it) },
                         isAscending = isAscending,
-                        onToggleAscending = { isAscending = !isAscending },
+                        onToggleAscending = { viewModel.toggleAscending() },
                         onTrackClick = onTrackClickLambda,
                         onMenuClick = onMenuClickLambda
                     )
@@ -147,6 +152,22 @@ private fun MusicListContent(
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
     val alphabetList = remember { ('A'..'Z').toList() + '#' }
+
+    // ⚡ Pre-calcular mapa de letra a índice O(1) para navegación ultra-rápida sin lag en UI thread
+    val letterIndexMap = remember(tracks) {
+        val map = mutableMapOf<Char, Int>()
+        tracks.forEachIndexed { index, track ->
+            val firstChar = track.title.firstOrNull()?.uppercaseChar()
+            if (firstChar != null) {
+                if (firstChar.isLetter() && firstChar in 'A'..'Z') {
+                    map.putIfAbsent(firstChar, index)
+                } else {
+                    map.putIfAbsent('#', index)
+                }
+            }
+        }
+        map
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         // 🔍 Buscador Superior
@@ -230,7 +251,11 @@ private fun MusicListContent(
                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                itemsIndexed(tracks, key = { index, track -> track.id }) { index, track ->
+                itemsIndexed(
+                    items = tracks,
+                    key = { _, track -> track.id },
+                    contentType = { _, _ -> "music_track_item" }
+                ) { index, track ->
                     MusicListItem(
                         track = track,
                         onClick = { onTrackClick(track) },
@@ -240,38 +265,97 @@ private fun MusicListContent(
                 }
             }
 
-            // 🔤 Barra Lateral de Alfabeto (A-Z Fast Scroll Index Bar)
-            Column(
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .fillMaxHeight()
-                    .padding(end = 4.dp),
-                verticalArrangement = Arrangement.SpaceEvenly,
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                alphabetList.forEach { letter ->
-                    Text(
-                        text = letter.toString(),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
-                        modifier = Modifier
-                            .clickable {
-                                // Buscar primer elemento que coincida con la letra
-                                val targetIndex = tracks.indexOfFirst { track ->
-                                    if (letter == '#') {
-                                        track.title.firstOrNull()?.isLetter() == false
-                                    } else {
-                                        track.title.startsWith(letter, ignoreCase = true)
+            if (selectedSortOption.equals("Nombre", ignoreCase = true)) {
+                // 🔤 Barra Lateral de Alfabeto (Solo cuando el orden es por Nombre)
+                val alphabetScrollState = rememberScrollState()
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .fillMaxHeight()
+                        .width(22.dp)
+                        .padding(vertical = 8.dp, horizontal = 2.dp)
+                        .background(
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        .verticalScroll(alphabetScrollState)
+                        .padding(vertical = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    alphabetList.forEach { letter ->
+                        Text(
+                            text = letter.toString(),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .clickable {
+                                    val targetIndex = letterIndexMap[letter] ?: -1
+                                    if (targetIndex != -1) {
+                                        coroutineScope.launch {
+                                            listState.scrollToItem(targetIndex)
+                                        }
                                     }
                                 }
-                                if (targetIndex != -1) {
+                                .padding(vertical = 2.dp, horizontal = 4.dp)
+                        )
+                    }
+                }
+            } else {
+                // 🎚️ Barra de Desplazamiento Arrastrable (Thumb Fast Scroll) para Duración, Recientes y Artista
+                var containerHeightPx by remember { mutableFloatStateOf(1f) }
+                val totalItems = tracks.size
+
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .fillMaxHeight()
+                        .width(24.dp)
+                        .padding(vertical = 8.dp, horizontal = 4.dp)
+                        .onGloballyPositioned { coordinates ->
+                            containerHeightPx = coordinates.size.height.toFloat().coerceAtLeast(1f)
+                        }
+                        .pointerInput(totalItems) {
+                            var lastTargetIndex = -1
+                            detectVerticalDragGestures { change, _ ->
+                                change.consume()
+                                val touchY = change.position.y.coerceIn(0f, containerHeightPx)
+                                val fraction = touchY / containerHeightPx
+                                val targetIndex = ((totalItems - 1) * fraction).toInt().coerceIn(0, (totalItems - 1).coerceAtLeast(0))
+                                if (totalItems > 0 && targetIndex != lastTargetIndex) {
+                                    lastTargetIndex = targetIndex
                                     coroutineScope.launch {
-                                        listState.animateScrollToItem(targetIndex)
+                                        listState.scrollToItem(targetIndex)
                                     }
                                 }
                             }
-                            .padding(vertical = 1.dp, horizontal = 2.dp)
+                        }
+                ) {
+                    // Pista visual translúcida de la barra
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                    )
+
+                    // Tirador / Botón de arrastre (Thumb)
+                    val firstVisibleIndex = remember { derivedStateOf { listState.firstVisibleItemIndex } }
+                    val thumbFraction = if (totalItems > 0) (firstVisibleIndex.value.toFloat() / totalItems.toFloat()).coerceIn(0f, 0.9f) else 0f
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .fillMaxHeight(0.15f)
+                            .align(Alignment.TopCenter)
+                            .offset(y = with(androidx.compose.ui.platform.LocalDensity.current) { (thumbFraction * containerHeightPx).toDp() })
+                            .background(
+                                color = MaterialTheme.colorScheme.primary,
+                                shape = RoundedCornerShape(12.dp)
+                            )
                     )
                 }
             }
