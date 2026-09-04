@@ -13,6 +13,8 @@ class PlayerUseCase @Inject constructor(
     val currentPosition: StateFlow<Long> get() = musicServiceConnection.currentPosition
     val isPlaying: StateFlow<Boolean> get() = musicServiceConnection.isPlaying
     val isShuffleModeEnabled: StateFlow<Boolean> get() = musicServiceConnection.isShuffleEnabled
+    val repeatMode: StateFlow<Int> get() = musicServiceConnection.repeatMode
+    val sleepTimerMinutes: StateFlow<Int?> get() = musicServiceConnection.sleepTimerMinutes
     val playlistId: StateFlow<Long?> get() = musicServiceConnection.playlistRec
 
     fun play(track: MusicTrack) {
@@ -33,6 +35,22 @@ class PlayerUseCase @Inject constructor(
 
     fun toggleShuffle() {
         musicServiceConnection.toggleShuffle()
+    }
+
+    fun toggleRepeatMode() {
+        musicServiceConnection.toggleRepeatMode()
+    }
+
+    fun setSleepTimer(minutes: Int) {
+        musicServiceConnection.setSleepTimer(minutes)
+    }
+
+    fun cancelSleepTimer() {
+        musicServiceConnection.cancelSleepTimer()
+    }
+
+    fun updateCurrentTrackTitle(newTitle: String) {
+        musicServiceConnection.updateCurrentTrackTitle(newTitle)
     }
 
     fun seekTo(position: Long) {

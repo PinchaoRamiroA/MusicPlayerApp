@@ -23,6 +23,9 @@ interface MusicTrackDao {
     suspend fun deleteAllTracks()
 
 
+    @Query("UPDATE music_tracks SET title = :newTitle WHERE trackId = :trackId")
+    suspend fun updateTrackTitle(trackId: String, newTitle: String)
+
     @Query("DELETE FROM music_tracks")
     suspend fun clearTracks()
 }

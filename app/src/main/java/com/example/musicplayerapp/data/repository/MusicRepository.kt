@@ -29,6 +29,10 @@ class MusicRepository(
 
     suspend fun getTrackById(id: String) = musicTrackDao.getTrackById(id)
 
+    suspend fun updateTrackTitle(trackId: String, newTitle: String) {
+        musicTrackDao.updateTrackTitle(trackId, newTitle)
+    }
+
     // Favoritos
     fun getFavorites() = favoriteDao.getFavoriteTracks()
     suspend fun addFavorite(trackId: String) = favoriteDao.addFavorite(FavoriteEntity(

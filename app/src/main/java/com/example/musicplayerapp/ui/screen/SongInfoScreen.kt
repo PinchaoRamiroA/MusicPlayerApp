@@ -20,11 +20,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.media3.common.Player
 import androidx.navigation.NavController
 import com.example.musicplayerapp.R
 import com.example.musicplayerapp.data.model.MusicTrack
 import com.example.musicplayerapp.ui.components.PlaylistSelectionModal
 import com.example.musicplayerapp.ui.nav.MusicNavDestinations
+import com.example.musicplayerapp.utils.ShareUtils
 import com.example.musicplayerapp.utils.extractAlbumArt
 import com.example.musicplayerapp.viewmodel.FavoritesViewModel
 import com.example.musicplayerapp.viewmodel.MusicListViewModel
@@ -41,14 +43,14 @@ fun SongInfoScreen(
 ) {
     val context = LocalContext.current
     val isFavorite = favoritesViewModel.isFavorite(track?.id ?: "")
-    val isPlaying = musicListViewModel.isPlaying.collectAsState().value
-    val currentPosition = musicListViewModel.currentPosition.collectAsState().value
+    val isPlaying by musicListViewModel.isPlaying.collectAsState()
+    val currentPosition by musicListViewModel.currentPosition.collectAsState()
+    val repeatMode by musicListViewModel.repeatMode.collectAsState()
+    val sleepTimerMinutes by musicListViewModel.sleepTimerMinutes.collectAsState()
 
     var showPlaylistModal by remember { mutableStateOf(false) }
     var showEditTitleDialog by remember { mutableStateOf(false) }
     var showSleepTimerDialog by remember { mutableStateOf(false) }
-    var isRepeatActive by remember { mutableStateOf(false) }
-    var selectedTimerMinutes by remember { mutableStateOf<Int?>(null) }
 
     val allPlaylists = playlistViewModel.uiState.collectAsState().value.playlists
 
@@ -131,11 +133,11 @@ fun SongInfoScreen(
             }
 
             // Reproducir en círculo / bucle
-            IconButton(onClick = { isRepeatActive = !isRepeatActive }) {
+            IconButton(onClick = { musicListViewModel.toggleRepeatMode() }) {
                 Icon(
                     imageVector = Icons.Default.Refresh,
                     contentDescription = "Reproducir en círculo",
-                    tint = if (isRepeatActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                    tint = if (repeatMode != Player.REPEAT_MODE_OFF) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                 )
             }
 
@@ -144,19 +146,12 @@ fun SongInfoScreen(
                 Icon(
                     imageVector = Icons.Default.Notifications,
                     contentDescription = "Temporizador de apagado",
-                    tint = if (selectedTimerMinutes != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                    tint = if (sleepTimerMinutes != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                 )
             }
 
             // Compartir canción vía WhatsApp y otras apps
-            IconButton(onClick = {
-                val sendIntent = Intent().apply {
-                    action = Intent.ACTION_SEND
-                    putExtra(Intent.EXTRA_TEXT, "Escuchando: ${track.title} - ${track.artist}")
-                    type = "text/plain"
-                }
-                context.startActivity(Intent.createChooser(sendIntent, "Compartir canción vía..."))
-            }) {
+            IconButton(onClick = { ShareUtils.shareTrack(context, track) }) {
                 Icon(
                     imageVector = Icons.Default.Share,
                     contentDescription = "Compartir",
@@ -290,7 +285,9 @@ fun SongInfoScreen(
                 },
                 confirmButton = {
                     Button(onClick = {
-                        Log.d("SongInfoScreen", "Nuevo título ingresado: $newTitle")
+                        if (newTitle.isNotBlank() && newTitle != track.title) {
+                            musicListViewModel.updateTrackTitle(track.id, newTitle)
+                        }
                         showEditTitleDialog = false
                     }) {
                         Text("Guardar")
@@ -306,36 +303,35 @@ fun SongInfoScreen(
 
         // Diálogo para temporizador de apagado (Sleep Timer)
         if (showSleepTimerDialog) {
-            val timerOptions = listOf(15, 30, 45, 60)
+            val timerOptions = listOf(5, 10, 15, 30, 45, 60)
             AlertDialog(
                 onDismissRequest = { showSleepTimerDialog = false },
                 title = { Text("Temporizador de apagado") },
                 text = {
                     Column {
                         Text(
-                            text = if (selectedTimerMinutes != null) "Temporizador activo: $selectedTimerMinutes min" else "Selecciona el tiempo para detener la música:",
+                            text = if (sleepTimerMinutes != null) "Temporizador activo: $sleepTimerMinutes min" else "Selecciona el tiempo para detener la música:",
                             style = MaterialTheme.typography.bodyMedium
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                         timerOptions.forEach { minutes ->
                             TextButton(
                                 onClick = {
-                                    selectedTimerMinutes = minutes
-                                    Log.d("SongInfoScreen", "Alarma de apagado programada: $minutes min")
+                                    musicListViewModel.setSleepTimer(minutes)
                                     showSleepTimerDialog = false
                                 },
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Text(
                                     text = "$minutes minutos",
-                                    color = if (selectedTimerMinutes == minutes) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                    color = if (sleepTimerMinutes == minutes) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                                 )
                             }
                         }
-                        if (selectedTimerMinutes != null) {
+                        if (sleepTimerMinutes != null) {
                             TextButton(
                                 onClick = {
-                                    selectedTimerMinutes = null
+                                    musicListViewModel.cancelSleepTimer()
                                     showSleepTimerDialog = false
                                 },
                                 modifier = Modifier.fillMaxWidth()

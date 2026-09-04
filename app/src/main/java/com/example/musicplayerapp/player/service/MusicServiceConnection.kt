@@ -34,11 +34,18 @@ class MusicServiceConnection @Inject constructor(
     private val _isShuffleEnabled = MutableStateFlow(false)
     val isShuffleEnabled: StateFlow<Boolean> = _isShuffleEnabled.asStateFlow()
 
+    private val _repeatMode = MutableStateFlow(Player.REPEAT_MODE_OFF)
+    val repeatMode: StateFlow<Int> = _repeatMode.asStateFlow()
+
+    private val _sleepTimerMinutes = MutableStateFlow<Int?>(null)
+    val sleepTimerMinutes: StateFlow<Int?> = _sleepTimerMinutes.asStateFlow()
+
     val playlistRec = MutableStateFlow<Long?>(null)
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var controller: MediaController? = null
     private var progressJob: Job? = null
+    private var sleepTimerJob: Job? = null
 
     private var originalList = mutableListOf<MediaItem>()
     private var currentList = mutableListOf<MediaItem>()
@@ -89,6 +96,41 @@ class MusicServiceConnection @Inject constructor(
         controller?.seekTo(newIndex, pos ?: 0L)
         controller?.prepare()
         controller?.play()
+    }
+
+    fun toggleRepeatMode() {
+        if (!isConnected()) return
+        val nextMode = when (_repeatMode.value) {
+            Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ONE
+            Player.REPEAT_MODE_ONE -> Player.REPEAT_MODE_ALL
+            else -> Player.REPEAT_MODE_OFF
+        }
+        _repeatMode.value = nextMode
+        controller?.repeatMode = nextMode
+        Log.d("MusicServiceConnection", "Repeat mode set to: $nextMode")
+    }
+
+    fun setSleepTimer(minutes: Int) {
+        sleepTimerJob?.cancel()
+        _sleepTimerMinutes.value = minutes
+        Log.d("MusicServiceConnection", "Sleep timer set for $minutes minutes")
+        sleepTimerJob = serviceScope.launch {
+            delay(minutes * 60 * 1000L)
+            pause()
+            _sleepTimerMinutes.value = null
+            Log.d("MusicServiceConnection", "Sleep timer finished. Playback paused.")
+        }
+    }
+
+    fun cancelSleepTimer() {
+        sleepTimerJob?.cancel()
+        sleepTimerJob = null
+        _sleepTimerMinutes.value = null
+        Log.d("MusicServiceConnection", "Sleep timer cancelled")
+    }
+
+    fun updateCurrentTrackTitle(newTitle: String) {
+        _currentTrack.value = _currentTrack.value?.copy(title = newTitle)
     }
 
     fun getQueue(): List<MusicTrack> = currentList.map { it.toMusicTrack() }
@@ -183,6 +225,10 @@ class MusicServiceConnection @Inject constructor(
         _currentPosition.value = 0L
         _isPlaying.value = false
         _isShuffleEnabled.value = false
+        _repeatMode.value = Player.REPEAT_MODE_OFF
+        _sleepTimerMinutes.value = null
+        sleepTimerJob?.cancel()
+        sleepTimerJob = null
         originalList.clear()
         currentList.clear()
     }
@@ -205,6 +251,10 @@ class MusicServiceConnection @Inject constructor(
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             _isPlaying.value = isPlaying
+        }
+
+        override fun onRepeatModeChanged(repeatMode: Int) {
+            _repeatMode.value = repeatMode
         }
     }
 }

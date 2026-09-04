@@ -2,7 +2,9 @@ package com.example.musicplayerapp.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.media3.common.Player
 import com.example.musicplayerapp.data.model.MusicTrack
+import com.example.musicplayerapp.data.repository.MusicRepository
 import com.example.musicplayerapp.domain.usecase.PlayerUseCase
 import com.example.musicplayerapp.domain.usecase.ScanMusicUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -21,7 +23,8 @@ sealed class MusicListUiState {
 @HiltViewModel
 class MusicListViewModel @Inject constructor(
     private val scanMusicUseCase: ScanMusicUseCase,
-    private val playerUseCase: PlayerUseCase
+    private val playerUseCase: PlayerUseCase,
+    private val musicRepository: MusicRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<MusicListUiState>(MusicListUiState.Loading)
@@ -32,6 +35,8 @@ class MusicListViewModel @Inject constructor(
     val currentPosition = playerUseCase.currentPosition.stateIn(viewModelScope, SharingStarted.Lazily, 0L)
     val isPlaying = playerUseCase.isPlaying.stateIn(viewModelScope, SharingStarted.Lazily, false)
     val isShuffleModeEnabled = playerUseCase.isShuffleModeEnabled.stateIn(viewModelScope, SharingStarted.Lazily, false)
+    val repeatMode = playerUseCase.repeatMode.stateIn(viewModelScope, SharingStarted.Lazily, Player.REPEAT_MODE_OFF)
+    val sleepTimerMinutes = playerUseCase.sleepTimerMinutes.stateIn(viewModelScope, SharingStarted.Lazily, null)
     val playlistId = playerUseCase.playlistId.stateIn(viewModelScope, SharingStarted.Lazily, -1L)
 
     init {
@@ -43,6 +48,17 @@ class MusicListViewModel @Inject constructor(
     fun nextTrack() = playerUseCase.next()
     fun previousTrack() = playerUseCase.previous()
     fun toggleShuffle() = playerUseCase.toggleShuffle()
+    fun toggleRepeatMode() = playerUseCase.toggleRepeatMode()
+    fun setSleepTimer(minutes: Int) = playerUseCase.setSleepTimer(minutes)
+    fun cancelSleepTimer() = playerUseCase.cancelSleepTimer()
+
+    fun updateTrackTitle(trackId: String, newTitle: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            musicRepository.updateTrackTitle(trackId, newTitle)
+            playerUseCase.updateCurrentTrackTitle(newTitle)
+        }
+    }
+
     fun seekTo(position: Long) = playerUseCase.seekTo(position)
     fun queueNext(trackId: String) = playerUseCase.queueNext(trackId)
 
