@@ -10,10 +10,12 @@ import com.example.musicplayerapp.data.model.Playlist
 import com.example.musicplayerapp.domain.usecase.PlayerUseCase
 import com.example.musicplayerapp.domain.usecase.PlaylistUseCases
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -106,26 +108,18 @@ class PlaylistViewModel @Inject constructor(
         }
     }
 
-    fun getPlaylistTracks(playlistId: Long): StateFlow<List<MusicTrack>> {
-        val tracksFlow = MutableStateFlow<List<MusicTrack>>(emptyList())
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true)
-            playlistUseCases.getPlaylistWithTracks(playlistId).collect { playlistWithTracks ->
-                val tracks = playlistWithTracks?.tracks?.map { trackEntity -> MusicTrack(
+    fun getPlaylistTracks(playlistId: Long): Flow<List<MusicTrack>> {
+        return playlistUseCases.getPlaylistWithTracks(playlistId).map { playlistWithTracks ->
+            playlistWithTracks?.tracks?.map { trackEntity ->
+                MusicTrack(
                     id = trackEntity.trackId,
                     title = trackEntity.title,
                     artist = trackEntity.artist,
                     album = trackEntity.album,
                     duration = trackEntity.duration,
                     data = trackEntity.data
-                ) }
-                if (tracks != null) {
-                    tracksFlow.value = tracks
-                    _uiState.value = _uiState.value.copy(isLoading = false)
-                }
-                Log.d("PlaylistViewModel", "Playlist updated: $tracks")
-            }
+                )
+            } ?: emptyList()
         }
-        return tracksFlow.asStateFlow()
     }
 }

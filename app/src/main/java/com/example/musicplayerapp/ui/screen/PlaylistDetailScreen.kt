@@ -47,14 +47,15 @@ fun PlaylistDetailScreen(
     playlistViewModel: PlaylistViewModel = hiltViewModel(),
     favoritesViewModel: FavoritesViewModel = hiltViewModel()
 ) {
-    val tracksState by playlistViewModel.getPlaylistTracks(playlistId).collectAsState()
+    val tracksFlow = remember(playlistId) { playlistViewModel.getPlaylistTracks(playlistId) }
+    val tracksState by tracksFlow.collectAsState(initial = null)
     val currentTrack by musicListViewModel.currentTrack.collectAsState()
     val uiState by playlistViewModel.uiState.collectAsState()
 
     var selectedTrack by remember { mutableStateOf<MusicTrack?>(null) }
     var showMenuModal by remember { mutableStateOf(false) }
     var showPlaylistModal by remember { mutableStateOf(false) }
-    val allPlaylists = playlistViewModel.uiState.collectAsState().value.playlists
+    val allPlaylists = uiState.playlists
 
     MaterialTheme(colorScheme = DarkColorScheme) {
         Log.d("PlaylistDetailScreen", "Playlist ID: $playlistId")
@@ -71,9 +72,10 @@ fun PlaylistDetailScreen(
                 }
             }
         ) { padding ->
+            val tracks = tracksState
             when {
-                uiState.isLoading -> LoadingContent()
-                tracksState.isEmpty() -> {
+                tracks == null -> LoadingContent()
+                tracks.isEmpty() -> {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -95,11 +97,11 @@ fun PlaylistDetailScreen(
                         contentPadding = PaddingValues(16.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        items(tracksState) { track: MusicTrack ->
+                        items(tracks) { track: MusicTrack ->
                             MusicListItem(
                                 track = track,
                                 onClick = {
-                                    musicListViewModel.setPlaylist(tracksState, tracksState.indexOf(track), playlistId)
+                                    musicListViewModel.setPlaylist(tracks, tracks.indexOf(track), playlistId)
                                     musicListViewModel.playTrack(track)
                                 },
                                 showMenu = true,
