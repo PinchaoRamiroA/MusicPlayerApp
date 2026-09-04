@@ -44,16 +44,22 @@ fun MusicListScreen(
                 is MusicListUiState.Error -> ErrorContent((uiState as MusicListUiState.Error).message)
                 is MusicListUiState.Success -> {
                     val tracks = (uiState as MusicListUiState.Success).tracks
-                    MusicListContent(
-                        tracks = tracks,
-                        onTrackClick = { track ->
+                    val onTrackClickLambda = remember(tracks) {
+                        { track: MusicTrack ->
                             viewModel.setPlaylist(tracks, tracks.indexOf(track), -1)
                             viewModel.playTrack(track)
-                        },
-                        onMenuClick = { track ->
+                        }
+                    }
+                    val onMenuClickLambda = remember {
+                        { track: MusicTrack ->
                             selectedTrack = track
                             isOptionsOpen = true
                         }
+                    }
+                    MusicListContent(
+                        tracks = tracks,
+                        onTrackClick = onTrackClickLambda,
+                        onMenuClick = onMenuClickLambda
                     )
                 }
             }
