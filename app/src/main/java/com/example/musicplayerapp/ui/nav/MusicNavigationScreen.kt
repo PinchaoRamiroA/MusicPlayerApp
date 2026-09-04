@@ -10,6 +10,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.musicplayerapp.ui.components.NowPlayingFooter
@@ -35,6 +36,8 @@ fun MusicNavigationScreen(
     favoritesViewModel: FavoritesViewModel
 ) {
     val navController = rememberNavController()
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
 
     val tabs = listOf(
         "Canciones" to MusicNavDestinations.MUSIC_LIST_ROUTE,
@@ -52,24 +55,26 @@ fun MusicNavigationScreen(
     MaterialTheme(colorScheme = DarkColorScheme) {
         Scaffold(
             bottomBar = {
-                currentTrack?.let { track ->
-                    NowPlayingFooter(
-                        currentTrack = track,
-                        isPlaying = isPlaying,
-                        isShuffleEnabled = isShuffleEnabled,
-                        onPlayPauseClick = {
-                            if (isPlaying) {
-                                musicListViewModel.pauseTrack()
-                            } else {
-                                musicListViewModel.playTrack(track)
-                                musicListViewModel.seekTo(currentPosition)
-                            }
-                        },
-                        onNextClick = { musicListViewModel.nextTrack() },
-                        onPreviousClick = { musicListViewModel.previousTrack() },
-                        onToggleShuffleClick = { musicListViewModel.toggleShuffle() },
-                        navController = navController
-                    )
+                if (currentRoute != MusicNavDestinations.NOW_PLAYING_ROUTE) {
+                    currentTrack?.let { track ->
+                        NowPlayingFooter(
+                            currentTrack = track,
+                            isPlaying = isPlaying,
+                            isShuffleEnabled = isShuffleEnabled,
+                            onPlayPauseClick = {
+                                if (isPlaying) {
+                                    musicListViewModel.pauseTrack()
+                                } else {
+                                    musicListViewModel.playTrack(track)
+                                    musicListViewModel.seekTo(currentPosition)
+                                }
+                            },
+                            onNextClick = { musicListViewModel.nextTrack() },
+                            onPreviousClick = { musicListViewModel.previousTrack() },
+                            onToggleShuffleClick = { musicListViewModel.toggleShuffle() },
+                            navController = navController
+                        )
+                    }
                 }
             }
         ) { innerPadding ->
