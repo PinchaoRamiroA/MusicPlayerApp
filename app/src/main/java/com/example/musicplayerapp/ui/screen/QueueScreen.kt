@@ -47,20 +47,32 @@ import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.rememberAsyncImagePainter
 import com.example.musicplayerapp.data.model.MusicTrack
+import com.example.musicplayerapp.ui.components.PlaylistSelectionModal
+import com.example.musicplayerapp.ui.components.TrackOptionsModal
 import com.example.musicplayerapp.ui.theme.DarkColorScheme
 import com.example.musicplayerapp.utils.extractAlbumArt
+import com.example.musicplayerapp.viewmodel.FavoritesViewModel
+import com.example.musicplayerapp.viewmodel.PlaylistViewModel
 import com.example.musicplayerapp.viewmodel.QueueViewModel
 import kotlinx.coroutines.delay
 
 @Composable
 fun QueueScreen(
-    viewModel: QueueViewModel = hiltViewModel()
+    viewModel: QueueViewModel = hiltViewModel(),
+    playlistViewModel: PlaylistViewModel = hiltViewModel(),
+    favoritesViewModel: FavoritesViewModel = hiltViewModel()
 ) {
     val queue by viewModel.queue.collectAsState()
     val currentTrack by viewModel.currentTrack.collectAsState()
     val isPlaying by viewModel.isPlaying.collectAsState()
 
-    MaterialTheme( colorScheme = DarkColorScheme) {
+    var selectedTrack by remember { mutableStateOf<MusicTrack?>(null) }
+    var isOptionsOpen by remember { mutableStateOf(false) }
+    var isPlaylistModalOpen by remember { mutableStateOf(false) }
+
+    val allPlaylists by playlistViewModel.uiState.collectAsState()
+
+    MaterialTheme(colorScheme = DarkColorScheme) {
         Scaffold(
             topBar = {
                 QueueTopBar(
@@ -68,30 +80,13 @@ fun QueueScreen(
                     currentTrack = currentTrack
                 )
             },
-            containerColor = Color(0xFF0A0E27)
+            containerColor = Color(0xFF00020A)
         ) { padding ->
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
             ) {
-                // Current Playing Section (if there's a current track)
-                currentTrack?.let { track ->
-                    CurrentPlayingSection(
-                        track = track,
-                        isPlaying = isPlaying,
-                        onPlayPause = { viewModel.togglePlayPause() }
-                    )
-
-                    HorizontalDivider(
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                        color = Color.White.copy(alpha = 0.1f)
-                    )
-                }
-
-                // Queue Header
-                QueueHeader(queueSize = queue.size)
-
                 // Reorderable Queue List
                 ReorderableList(
                     items = queue,
@@ -102,12 +97,53 @@ fun QueueScreen(
                     onTrackSelect = { track ->
                         viewModel.playTrack(track)
                     },
+                    onMenuClick = { track ->
+                        selectedTrack = track
+                        isOptionsOpen = true
+                    },
                     modifier = Modifier
                         .fillMaxSize()
                         .weight(1f)
                 )
             }
         }
+    }
+
+    // Diálogos y modales de opciones
+    if (isOptionsOpen) {
+        TrackOptionsModal(
+            track = selectedTrack,
+            onAddToFavorites = {
+                selectedTrack?.let { favoritesViewModel.toggleFavorite(it.id) }
+                isOptionsOpen = false
+            },
+            onAddToPlaylist = { isPlaylistModalOpen = true },
+            onRemoveFromPlaylist = null,
+            onPlayNext = {
+                selectedTrack?.id?.let { id ->
+                    viewModel.queueNext(id)
+                }
+                isOptionsOpen = false
+            },
+            onDismiss = { isOptionsOpen = false }
+        )
+    }
+
+    if (isPlaylistModalOpen) {
+        PlaylistSelectionModal(
+            playlists = allPlaylists.playlists,
+            onDismiss = {
+                isPlaylistModalOpen = false
+                isOptionsOpen = false
+            },
+            onPlaylistSelected = { targetPlaylistId ->
+                selectedTrack?.let {
+                    playlistViewModel.addTrackToPlaylist(targetPlaylistId, it)
+                }
+                isPlaylistModalOpen = false
+                isOptionsOpen = false
+            }
+        )
     }
 }
 
@@ -155,94 +191,6 @@ fun QueueTopBar(
 }
 
 @Composable
-fun CurrentPlayingSection(
-    track: MusicTrack,
-    isPlaying: Boolean,
-    onPlayPause: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.background
-        ),
-        shape = RoundedCornerShape(16.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Album Art with Play/Pause overlay
-            Box {
-                Card(
-                    modifier = Modifier.size(56.dp),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Image(
-                        painter = rememberAsyncImagePainter(extractAlbumArt(track.data)),
-                        contentDescription = track.title,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-
-                // Play/Pause Button Overlay
-                FloatingActionButton(
-                    onClick = onPlayPause,
-                    modifier = Modifier
-                        .size(24.dp)
-                        .align(Alignment.BottomEnd)
-                        .offset(x = 4.dp, y = 4.dp),
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = Color.White
-                ) {
-                    Icon(
-                        imageVector = if (isPlaying) Icons.Default.Add else Icons.Default.PlayArrow,
-                        contentDescription = if (isPlaying) "Pause" else "Play",
-                        modifier = Modifier.size(12.dp)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.width(16.dp))
-
-            // Track Info
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Reproduciendo ahora",
-                    color = MaterialTheme.colorScheme.primary,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium
-                )
-                Text(
-                    text = track.title,
-                    color = Color.White,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = track.artist,
-                    color = Color.Gray,
-                    fontSize = 14.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-
-            // Animated Playing Indicator
-            if (isPlaying) {
-                PlayingAnimationIndicator()
-            }
-        }
-    }
-}
-
-@Composable
 fun PlayingAnimationIndicator() {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -283,45 +231,12 @@ fun PlayingAnimationIndicator() {
 }
 
 @Composable
-fun QueueHeader(queueSize: Int) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            Icons.Outlined.DateRange,
-            contentDescription = null,
-            tint = Color.Gray,
-            modifier = Modifier.size(20.dp)
-        )
-
-        Spacer(modifier = Modifier.width(8.dp))
-
-        Text(
-            text = "Siguiente en la cola",
-            color = Color.Gray,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Medium
-        )
-
-        Spacer(modifier = Modifier.weight(1f))
-
-        Text(
-            text = "$queueSize canciones",
-            color = Color.Gray,
-            fontSize = 12.sp
-        )
-    }
-}
-
-@Composable
 fun ReorderableList(
     items: List<MusicTrack>,
     currentTrackId: String?,
     onMove: (Int, Int) -> Unit,
     onTrackSelect: (MusicTrack) -> Unit,
+    onMenuClick: (MusicTrack) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var draggedItem by remember { mutableStateOf<DraggedItem?>(null) }
@@ -332,7 +247,10 @@ fun ReorderableList(
     var dragOffsetPx by remember { mutableFloatStateOf(0f) }
 
     // Lista mutable interna para respuesta visual instantánea durante el arrastre
-    var listItems by remember(items.size) { mutableStateOf(items) }
+    var listItems by remember(items) { mutableStateOf(items) }
+    LaunchedEffect(items) {
+        listItems = items
+    }
 
     // 🎯 Auto-scroll a la canción que está sonando actualmente (solo una vez al cargar la lista)
     var hasAutoScrolled by remember { mutableStateOf(false) }
@@ -402,6 +320,7 @@ fun ReorderableList(
                         }
                     },
                     onTrackSelect = onTrackSelect,
+                    onMenuClick = { onMenuClick(track) },
                     dragOffset = if (isDragging) Offset(0f, dragOffsetPx) else Offset.Zero,
                     modifier = Modifier.animateItem()
                 )
@@ -420,6 +339,7 @@ fun DraggableTrackItem(
     onDragEnd: () -> Unit,
     onDragDelta: (Float) -> Unit,
     onTrackSelect: (MusicTrack) -> Unit,
+    onMenuClick: () -> Unit,
     dragOffset: Offset,
     modifier: Modifier = Modifier
 ) {
@@ -594,7 +514,7 @@ fun DraggableTrackItem(
 
             // More Options
             IconButton(
-                onClick = { /* Show options menu */ },
+                onClick = onMenuClick,
                 modifier = Modifier.size(40.dp)
             ) {
                 Icon(
@@ -622,37 +542,4 @@ fun formatDuration(duration: Long): String {
     val minutes = duration / 60000
     val seconds = (duration % 60000) / 1000
     return String.format("%d:%02d", minutes, seconds)
-}
-
-@Preview(showBackground = true, backgroundColor = 0xFF0A0E27)
-@Composable
-fun QueueScreenPreview() {
-    val sampleTracks = listOf(
-        MusicTrack(id = "1", title = "505", artist = "Arctic Monkeys", duration = 253000, data = "", album = ""),
-        MusicTrack(id = "2", title = "Le parole lontane", artist = "Måneskin", duration = 233000, data = "", album = ""),
-        MusicTrack(id = "3", title = "Planet Caravan (2009 Remaster)", artist = "Black Sabbath", duration = 269000, data = "", album = ""),
-        MusicTrack(id = "4", title = "You", artist = "Radiohead", duration = 208000, data = "", album = ""),
-        MusicTrack(id = "5", title = "Follow Me Around", artist = "Radiohead", duration = 326000, data = "", album = ""),
-        MusicTrack(id = "6", title = "Symphony Of Destruction", artist = "Megadeth", duration = 242000, data = "", album = ""),
-        MusicTrack(id = "7", title = "Radioactive", artist = "Imagine Dragons", duration = 261000, data = "", album = ""),
-    )
-
-    MaterialTheme( colorScheme = DarkColorScheme)
-    {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.background
-        ) {
-            ReorderableList(
-                items = sampleTracks,
-                currentTrackId = "2", // Simulate current playing track
-                onMove = { from, to ->
-                    println("Moving item from $from to $to")
-                },
-                onTrackSelect = { track ->
-                    println("Selected track: ${track.title}")
-                }
-            )
-        }
-    }
 }

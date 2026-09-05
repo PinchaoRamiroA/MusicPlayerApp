@@ -54,4 +54,9 @@ class QueueViewModel @Inject constructor(
     fun playTrack(track: MusicTrack) {
         playerUseCase.play(track)
     }
+
+    fun queueNext(trackId: String) {
+        playerUseCase.queueNext(trackId)
+        loadQueue()
+    }
 }

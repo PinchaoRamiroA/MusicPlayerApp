@@ -68,13 +68,16 @@ class MusicServiceConnection @Inject constructor(
         }
 
         val existingIndex = currentList.indexOfFirst { it.mediaId == trackId }
+        val targetIndex = (currentIndex + 1).coerceAtMost(currentList.lastIndex)
         if (existingIndex != -1) {
-            controller?.moveMediaItem(existingIndex, ((controller?.nextMediaItemIndex
-                ?: (currentIndex + 1))))
-            Log.d("MusicServiceConnection", "Track ${track.mediaMetadata.title} moved from $existingIndex to ${controller?.nextMediaItemIndex}")
+            val item = currentList.removeAt(existingIndex)
+            currentList.add(targetIndex, item)
+            controller?.moveMediaItem(existingIndex, targetIndex)
+            Log.d("MusicServiceConnection", "Track ${track.mediaMetadata.title} moved from $existingIndex to $targetIndex")
         } else {
             Log.d("MusicServiceConnection", "Adding track to queue: ${track.mediaId}")
-            controller?.addMediaItem(currentIndex + 1, track)
+            currentList.add(targetIndex, track)
+            controller?.addMediaItem(targetIndex, track)
         }
     }
 
