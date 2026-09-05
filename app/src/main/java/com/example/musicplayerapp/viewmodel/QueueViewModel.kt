@@ -40,7 +40,6 @@ class QueueViewModel @Inject constructor(
     fun moveTrack(fromIndex: Int, toIndex: Int) {
         Log.d("QueueViewModel", "Moving track from $fromIndex to $toIndex")
         playerUseCase.moveTrack(fromIndex, toIndex)
-        loadQueue() // Refrescamos después del cambio
     }
 
     fun togglePlayPause() {

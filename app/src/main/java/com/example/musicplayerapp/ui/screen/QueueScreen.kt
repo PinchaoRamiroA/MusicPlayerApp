@@ -8,6 +8,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -16,6 +17,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.DateRange
@@ -326,74 +328,82 @@ fun ReorderableList(
     var targetIndex by remember { mutableIntStateOf(-1) }
     val listState = rememberLazyListState()
     val haptic = LocalHapticFeedback.current
-    val density = LocalDensity.current
-    var itemHeights by remember { mutableStateOf(mapOf<Int, Float>()) }
+    var draggedTrackId by remember { mutableStateOf<String?>(null) }
+    var dragOffsetPx by remember { mutableFloatStateOf(0f) }
 
-    MaterialTheme( colorScheme = DarkColorScheme) {
+    // Lista mutable interna para respuesta visual instantánea durante el arrastre
+    var listItems by remember(items.size) { mutableStateOf(items) }
+
+    // 🎯 Auto-scroll a la canción que está sonando actualmente (solo una vez al cargar la lista)
+    var hasAutoScrolled by remember { mutableStateOf(false) }
+    LaunchedEffect(currentTrackId, items) {
+        if (!hasAutoScrolled && currentTrackId != null && items.isNotEmpty()) {
+            val targetIdx = items.indexOfFirst { it.id == currentTrackId }
+            if (targetIdx >= 0) {
+                listState.scrollToItem(targetIdx)
+                hasAutoScrolled = true
+            }
+        }
+    }
+
+    MaterialTheme(colorScheme = DarkColorScheme) {
         LazyColumn(
             state = listState,
             modifier = modifier.padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             itemsIndexed(
-                items = items,
-                key = { _, track -> track.id }
+                items = listItems,
+                key = { _, track -> track.id },
+                contentType = { _, _ -> "queue_track_item" }
             ) { index, track ->
-                val isDragging = draggedItem?.index == index
-                val isTarget = targetIndex == index && targetIndex != draggedItem?.index
+                val isDragging = draggedTrackId == track.id
                 val isCurrentTrack = track.id == currentTrackId
 
                 DraggableTrackItem(
                     track = track,
                     index = index,
                     isDragging = isDragging,
-                    isTarget = isTarget,
                     isCurrentTrack = isCurrentTrack,
-                    onDragStart = { offset ->
+                    onDragStart = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        draggedItem = DraggedItem(
-                            index = index,
-                            track = track,
-                            offset = offset
-                        )
+                        draggedTrackId = track.id
+                        dragOffsetPx = 0f
                     },
                     onDragEnd = {
-                        draggedItem?.let { dragged ->
-                            if (targetIndex != -1 && targetIndex != dragged.index) {
-                                onMove(dragged.index, targetIndex)
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            }
-                        }
-                        draggedItem = null
-                        targetIndex = -1
+                        draggedTrackId = null
+                        dragOffsetPx = 0f
                     },
-                    onDrag = { dragAmount ->
-                        draggedItem?.let { dragged ->
-                            draggedItem = dragged.copy(
-                                offset = dragged.offset + dragAmount
-                            )
+                    onDragDelta = { deltaY ->
+                        if (draggedTrackId == track.id) {
+                            dragOffsetPx += deltaY
+                            val moveThreshold = 65f
+                            val currentIndex = listItems.indexOfFirst { it.id == track.id }
 
-                            val itemHeight = itemHeights[index] ?: 0f
-                            if (itemHeight > 0) {
-                                val newTargetIndex = (dragged.index +
-                                        (dragged.offset.y / (itemHeight + 6.dp.value * density.density)).toInt())
-                                    .coerceIn(0, items.lastIndex)
-
-                                if (newTargetIndex != targetIndex) {
-                                    targetIndex = newTargetIndex
+                            if (currentIndex != -1) {
+                                if (dragOffsetPx > moveThreshold && currentIndex < listItems.lastIndex) {
+                                    val nextIndex = currentIndex + 1
+                                    onMove(currentIndex, nextIndex)
+                                    listItems = listItems.toMutableList().apply {
+                                        add(nextIndex, removeAt(currentIndex))
+                                    }
+                                    dragOffsetPx = 0f
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                } else if (dragOffsetPx < -moveThreshold && currentIndex > 0) {
+                                    val prevIndex = currentIndex - 1
+                                    onMove(currentIndex, prevIndex)
+                                    listItems = listItems.toMutableList().apply {
+                                        add(prevIndex, removeAt(currentIndex))
+                                    }
+                                    dragOffsetPx = 0f
                                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 }
                             }
                         }
                     },
                     onTrackSelect = onTrackSelect,
-                    onSizeChanged = { size ->
-                        itemHeights = itemHeights + (index to size.height.toFloat())
-                    },
-                    dragOffset = if (isDragging) draggedItem?.offset
-                        ?: Offset.Zero else Offset.Zero,
+                    dragOffset = if (isDragging) Offset(0f, dragOffsetPx) else Offset.Zero,
                     modifier = Modifier.animateItem()
-
                 )
             }
         }
@@ -405,13 +415,11 @@ fun DraggableTrackItem(
     track: MusicTrack,
     index: Int,
     isDragging: Boolean,
-    isTarget: Boolean,
     isCurrentTrack: Boolean,
-    onDragStart: (Offset) -> Unit,
+    onDragStart: () -> Unit,
     onDragEnd: () -> Unit,
-    onDrag: (Offset) -> Unit,
+    onDragDelta: (Float) -> Unit,
     onTrackSelect: (MusicTrack) -> Unit,
-    onSizeChanged: (IntSize) -> Unit,
     dragOffset: Offset,
     modifier: Modifier = Modifier
 ) {
@@ -434,7 +442,6 @@ fun DraggableTrackItem(
 
     val backgroundColor = when {
         isDragging -> Color(0xFF2A2F5A)
-        isTarget -> Color(0xFF1E2347)
         isCurrentTrack -> Color(0xFF1A1F3A).copy(alpha = 0.6f)
         else -> Color(0xFF16213E).copy(alpha = 0.2f)
     }
@@ -457,9 +464,6 @@ fun DraggableTrackItem(
                     translationX = dragOffset.x
                     translationY = dragOffset.y
                 }
-            }
-            .onGloballyPositioned { coordinates ->
-                onSizeChanged(coordinates.size)
             },
         colors = CardDefaults.cardColors(containerColor = backgroundColor),
         shape = RoundedCornerShape(14.dp),
@@ -479,20 +483,20 @@ fun DraggableTrackItem(
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
-                    .pointerInput(Unit) {
-                        detectDragGesturesAfterLongPress(
-                            onDragStart = onDragStart,
-                            onDragEnd = onDragEnd,
-                            onDragCancel = onDragEnd,
+                    .pointerInput(track.id) {
+                        detectDragGestures(
+                            onDragStart = { onDragStart() },
+                            onDragEnd = { onDragEnd() },
+                            onDragCancel = { onDragEnd() },
                             onDrag = { change, dragAmount ->
                                 change.consume()
-                                onDrag(dragAmount)
+                                onDragDelta(dragAmount.y)
                             }
                         )
                     }
             ) {
                 Icon(
-                    imageVector = Icons.Default.MoreVert,
+                    imageVector = Icons.Default.Menu,
                     contentDescription = "Reordenar",
                     tint = when {
                         isDragging -> Color.White
